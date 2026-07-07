@@ -1,0 +1,40 @@
+const nodemailer = require("nodemailer");
+
+function getTransporter() {
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER) return null;
+  return nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: parseInt(process.env.EMAIL_PORT || "587"),
+    secure: process.env.EMAIL_PORT === "465",
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+}
+
+async function sendVerificationEmail(to, name, code) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    // Mode dev : affiche le code dans la console
+    console.log(`\n📧 CODE DE VERIFICATION pour ${to} : [ ${code} ]\n`);
+    return;
+  }
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || `Biborne <${process.env.EMAIL_USER}>`,
+    to,
+    subject: "Votre code de vérification Biborne",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+        <div style="background:linear-gradient(135deg,#E85D24,#FF7A45);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">
+          <span style="font-size:32px;font-weight:800;color:#fff">B</span>
+          <h1 style="color:#fff;font-size:20px;margin:8px 0 0">Biborne Messagerie</h1>
+        </div>
+        <p style="color:#1A1410;font-size:16px">Bonjour <strong>${name}</strong>,</p>
+        <p style="color:#6B5E54;font-size:14px">Voici votre code de vérification :</p>
+        <div style="background:#FFF0EB;border-radius:12px;padding:24px;text-align:center;margin:20px 0">
+          <span style="font-size:40px;font-weight:800;color:#E85D24;letter-spacing:8px">${code}</span>
+        </div>
+        <p style="color:#B0A49C;font-size:13px">Valable <strong>10 minutes</strong>. Ne le partagez avec personne.</p>
+      </div>`,
+  });
+}
+
+module.exports = { sendVerificationEmail };
