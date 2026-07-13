@@ -53,13 +53,17 @@ router.get("/:convId", async (req, res) => {
 // Texte
 router.post("/:convId/text", async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, clientMsgId } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: "Message vide" });
     const msg = await Message.create(buildMsg(req, req.params.convId, { type:"text", content }));
     await Conversation.update({ updatedAt: new Date() }, { where: { id: req.params.convId } });
     const full = await Message.findByPk(msg.id, { include: [{ model: Employee, attributes: ["id", "name"] }] });
-    emit(req.params.convId, req.user.type, full.toJSON());
-    res.json(full);
+    // clientMsgId permet à l'expéditeur de faire correspondre l'aperçu optimiste affiché
+    // instantanément avec le message confirmé par le serveur, et d'éviter un doublon
+    // quel que soit l'ordre d'arrivée entre la réponse HTTP et l'évènement socket.
+    const payload = { ...full.toJSON(), clientMsgId: clientMsgId || null };
+    emit(req.params.convId, req.user.type, payload);
+    res.json(payload);
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
@@ -75,8 +79,9 @@ router.post("/:convId/media", upload.single("file"), async (req, res) => {
     }));
     await Conversation.update({ updatedAt: new Date() }, { where: { id: req.params.convId } });
     const full = await Message.findByPk(msg.id, { include: [{ model: Employee, attributes: ["id", "name"] }] });
-    emit(req.params.convId, req.user.type, full.toJSON());
-    res.json(full);
+    const payload = { ...full.toJSON(), clientMsgId: req.body.clientMsgId || null };
+    emit(req.params.convId, req.user.type, payload);
+    res.json(payload);
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
