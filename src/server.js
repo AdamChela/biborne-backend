@@ -12,6 +12,7 @@ const conversationsRoutes = require("./routes/conversations.routes");
 const { router: messagesRouter, setIo } = require("./routes/messages.routes");
 const callsRoutes         = require("./routes/calls.routes");
 const invitesRoutes       = require("./routes/invites.routes");
+const quickRepliesRoutes  = require("./routes/quick-replies.routes");
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,7 @@ app.use("/api/conversations", conversationsRoutes);
 app.use("/api/messages",      messagesRouter);
 app.use("/api/calls",         callsRoutes);
 app.use("/api/invites",       invitesRoutes);
+app.use("/api/quick-replies", quickRepliesRoutes);
 
 setupSocket(io);
 

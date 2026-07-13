@@ -1,5 +1,5 @@
 const express = require("express");
-const { Conversation, Client, Employee, Message } = require("../models");
+const { Conversation, Client, Employee, Message, ConversationNote } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
 
 const router = express.Router();
@@ -55,6 +55,29 @@ router.patch("/:id/ticket", employeeOnly, async (req, res) => {
     await conv.save();
     req.io?.emit("ticket_updated", { conversationId: conv.id, ticketStatus: conv.ticketStatus, ticketOwner: conv.ticketOwner });
     res.json(conv);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Lire la note interne partagée d'une conversation
+router.get("/:id/note", employeeOnly, async (req, res) => {
+  try {
+    const note = await ConversationNote.findOne({ where: { conversationId: req.params.id } });
+    res.json(note || { content: "", updatedByName: null });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Mettre à jour (ou créer) la note interne partagée d'une conversation
+router.put("/:id/note", employeeOnly, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const conv = await Conversation.findByPk(req.params.id);
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable" });
+    const emp = await Employee.findByPk(req.user.id);
+    let note = await ConversationNote.findOne({ where: { conversationId: req.params.id } });
+    if (!note) note = await ConversationNote.create({ conversationId: req.params.id, content, updatedByName: emp?.name });
+    else { note.content = content; note.updatedByName = emp?.name; await note.save(); }
+    req.io?.emit("note_updated", { conversationId: req.params.id, content: note.content, updatedByName: note.updatedByName });
+    res.json(note);
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 

@@ -72,6 +72,19 @@ const ConversationParticipant = sequelize.define("ConversationParticipant", {
   guestToken:  { type: DataTypes.STRING },
 });
 
+// Note interne partagée : une seule par conversation, visible par tous les employés
+const ConversationNote = sequelize.define("ConversationNote", {
+  id:            { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  content:       { type: DataTypes.TEXT, defaultValue: "" },
+  updatedByName: { type: DataTypes.STRING },
+});
+
+// Réponse rapide partagée entre tous les employés
+const QuickReply = sequelize.define("QuickReply", {
+  id:   { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  text: { type: DataTypes.TEXT, allowNull: false },
+});
+
 // Relations
 Client.hasMany(Conversation, { foreignKey: "clientId" });
 Conversation.belongsTo(Client, { foreignKey: "clientId" });
@@ -91,5 +104,7 @@ Conversation.hasMany(ConversationInvite, { foreignKey: "conversationId" });
 ConversationInvite.belongsTo(Conversation, { foreignKey: "conversationId" });
 Conversation.hasMany(ConversationParticipant, { foreignKey: "conversationId" });
 ConversationParticipant.belongsTo(Conversation, { foreignKey: "conversationId" });
+Conversation.hasOne(ConversationNote, { foreignKey: "conversationId" });
+ConversationNote.belongsTo(Conversation, { foreignKey: "conversationId" });
 
-module.exports = { sequelize, Employee, Client, Conversation, Message, CallSession, ConversationInvite, ConversationParticipant };
+module.exports = { sequelize, Employee, Client, Conversation, Message, CallSession, ConversationInvite, ConversationParticipant, ConversationNote, QuickReply };

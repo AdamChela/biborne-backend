@@ -13,6 +13,38 @@ function randomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// ── CONNEXION UNIFIEE (PWA) ─────────────────────────────────────────────────────
+// Détecte automatiquement s'il s'agit d'un employé ou d'un client à partir de l'email.
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: "Email et mot de passe requis" });
+
+    const emp = await Employee.findOne({ where: { email } });
+    if (emp) {
+      if (!await bcrypt.compare(password, emp.password)) return res.status(401).json({ error: "Email ou mot de passe incorrect" });
+      const token = makeToken({ id: emp.id, type: "employee", role: emp.role, name: emp.name });
+      return res.json({ type: "employee", token, employee: { id: emp.id, name: emp.name, email: emp.email, role: emp.role } });
+    }
+
+    const client = await Client.findOne({ where: { email } });
+    if (client) {
+      if (!client.verified) return res.status(403).json({ error: "Compte non vérifié, vérifiez votre email", needsVerification: true });
+      if (!await bcrypt.compare(password, client.password)) return res.status(401).json({ error: "Email ou mot de passe incorrect" });
+      let conv = await Conversation.findOne({ where: { clientId: client.id } });
+      if (!conv) conv = await Conversation.create({ clientId: client.id });
+      const token = makeToken({ id: client.id, type: "client" });
+      return res.json({
+        type: "client", token,
+        client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city },
+        conversationId: conv.id,
+      });
+    }
+
+    return res.status(401).json({ error: "Email ou mot de passe incorrect" });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
 // ── EMPLOYES ──────────────────────────────────────────────────────────────────
 router.post("/employee/register", async (req, res) => {
   try {

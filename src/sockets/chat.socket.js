@@ -13,13 +13,15 @@ function setupSocket(io) {
     const u = socket.user;
     console.log(`[Socket] ${u.type} connecte (${u.id || u.displayName})`);
 
-    // ── Employé : rejoint la room globale
+    // ── Employé : rejoint la room globale + sa room personnelle (pour les appels)
     if (u.type === "employee") {
       socket.join("employees");
+      socket.join(`employee:${u.id}`);
     }
 
-    // ── Client : rejoint AUTOMATIQUEMENT sa conversation permanente
+    // ── Client : rejoint AUTOMATIQUEMENT sa conversation permanente + sa room personnelle (pour les appels)
     if (u.type === "client") {
+      socket.join(`client:${u.id}`);
       try {
         const conv = await Conversation.findOne({ where: { clientId: u.id } });
         if (conv) {
@@ -53,7 +55,7 @@ function setupSocket(io) {
     socket.on("call:offer", ({ targetClientId, sessionId, offer }) => {
       if (u.type !== "employee") return;
       io.to(`client:${targetClientId}`).emit("call:offer", {
-        sessionId, offer, callerName: u.name || "Biborne",
+        sessionId, offer, callerName: u.name || "Biborne", callerId: u.id,
       });
     });
     socket.on("call:answer", ({ sessionId, callerId, answer }) => {
