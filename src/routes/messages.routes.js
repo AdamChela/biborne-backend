@@ -1,6 +1,7 @@
 const express = require("express");
 const { Message, Conversation, Employee } = require("../models");
 const { upload } = require("../utils/upload");
+const { uploadBuffer } = require("../utils/cloudinary");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -78,9 +79,11 @@ router.post("/:convId/text", async (req, res) => {
 router.post("/:convId/media", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Aucun fichier reçu" });
+    // Stockage permanent sur Cloudinary (le disque de Render est effacé à chaque déploiement).
+    const uploaded = await uploadBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
     const msg = await Message.create(buildMsg(req, req.params.convId, {
       type: req.body.type || "file",
-      fileUrl: `/uploads/${req.file.filename}`,
+      fileUrl: uploaded.secure_url,
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
     }));

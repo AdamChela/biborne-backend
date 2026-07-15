@@ -1,14 +1,7 @@
 const multer = require("multer");
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, "../../uploads")),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, uuidv4() + ext);
-  },
-});
-
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+// Stockage en mémoire (et non sur disque) : les fichiers sont envoyés vers Cloudinary
+// juste après (voir routes/messages.routes.js + utils/cloudinary.js), donc pas besoin
+// d'écrire sur le disque local de Render, qui est de toute façon effacé à chaque déploiement.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 module.exports = { upload };
