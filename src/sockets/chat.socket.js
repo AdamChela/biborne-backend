@@ -52,10 +52,10 @@ function setupSocket(io) {
     });
 
     // ── WebRTC signaling
-    socket.on("call:offer", ({ targetClientId, sessionId, offer }) => {
+    socket.on("call:offer", ({ targetClientId, sessionId, offer, video }) => {
       if (u.type !== "employee") return;
       io.to(`client:${targetClientId}`).emit("call:offer", {
-        sessionId, offer, callerName: u.name || "Biborne", callerId: u.id,
+        sessionId, offer, callerName: u.name || "Biborne", callerId: u.id, video: !!video,
       });
     });
     socket.on("call:answer", ({ sessionId, callerId, answer }) => {

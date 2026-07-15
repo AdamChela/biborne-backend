@@ -52,6 +52,7 @@ const Message = sequelize.define("Message", {
 const CallSession = sequelize.define("CallSession", {
   id:           { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   status:       { type: DataTypes.STRING, defaultValue: "ringing" },
+  type:         { type: DataTypes.STRING, defaultValue: "audio" }, // "audio" ou "video"
   startedAt:    { type: DataTypes.DATE },
   endedAt:      { type: DataTypes.DATE },
   durationSecs: { type: DataTypes.INTEGER },
@@ -69,7 +70,9 @@ const ConversationParticipant = sequelize.define("ConversationParticipant", {
   id:          { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   displayName: { type: DataTypes.STRING, allowNull: false },
   role:        { type: DataTypes.STRING, defaultValue: "employee" },
-  guestToken:  { type: DataTypes.STRING },
+  // TEXT et non STRING : un token JWT dépasse souvent les 255 caractères de VARCHAR,
+  // ce qui faisait échouer silencieusement la création (erreur 500 "Erreur serveur").
+  guestToken:  { type: DataTypes.TEXT },
 });
 
 // Note interne partagée : une seule par conversation, visible par tous les employés

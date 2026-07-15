@@ -7,10 +7,10 @@ router.use(authMiddleware);
 
 router.post("/", employeeOnly, async (req, res) => {
   try {
-    const { clientId } = req.body;
+    const { clientId, type } = req.body;
     const client = await Client.findByPk(clientId);
     if (!client) return res.status(404).json({ error: "Client introuvable" });
-    const session = await CallSession.create({ callerId: req.user.id, receiverId: clientId, status: "ringing", startedAt: new Date() });
+    const session = await CallSession.create({ callerId: req.user.id, receiverId: clientId, status: "ringing", type: type === "video" ? "video" : "audio", startedAt: new Date() });
     req.io?.to(`client:${clientId}`).emit("incoming_call", { sessionId: session.id, callerName: req.user.name || "Biborne" });
     res.json(session);
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
