@@ -25,6 +25,8 @@ function buildMsg(req, convId, extra) {
     employeeId: req.user.type === "employee" ? req.user.id : null,
     clientId:   req.user.type === "client"   ? req.user.id : null,
     guestName:  req.user.type === "guest"    ? req.user.displayName : null,
+    guestId:    req.user.type === "guest"    ? req.user.id : null,
+    guestPhone: req.user.type === "guest"    ? req.user.phone : null,
     ...extra,
   };
 }
@@ -53,9 +55,13 @@ router.get("/:convId", async (req, res) => {
 // Texte
 router.post("/:convId/text", async (req, res) => {
   try {
-    const { content, clientMsgId } = req.body;
+    const { content, clientMsgId, mentions } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: "Message vide" });
-    const msg = await Message.create(buildMsg(req, req.params.convId, { type:"text", content }));
+    const msg = await Message.create(buildMsg(req, req.params.convId, {
+      type: "text",
+      content,
+      mentions: Array.isArray(mentions) && mentions.length ? JSON.stringify(mentions) : null,
+    }));
     await Conversation.update({ updatedAt: new Date() }, { where: { id: req.params.convId } });
     const full = await Message.findByPk(msg.id, { include: [{ model: Employee, attributes: ["id", "name"] }] });
     // clientMsgId permet à l'expéditeur de faire correspondre l'aperçu optimiste affiché

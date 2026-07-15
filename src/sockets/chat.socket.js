@@ -32,10 +32,11 @@ function setupSocket(io) {
       } catch(e) { console.error("[Socket] Erreur join client:", e.message); }
     }
 
-    // ── Invité : rejoint sa conversation
+    // ── Invité : rejoint sa conversation + sa room personnelle (pour recevoir des appels)
     if (u.type === "guest" && u.conversationId) {
       socket.join(u.conversationId);
       socket.data.convId = u.conversationId;
+      if (u.id) socket.join(`guest:${u.id}`);
     }
 
     // Rejoindre une room manuellement (employé ouvre une conversation)
@@ -52,9 +53,12 @@ function setupSocket(io) {
     });
 
     // ── WebRTC signaling
-    socket.on("call:offer", ({ targetClientId, sessionId, offer, video }) => {
+    socket.on("call:offer", ({ targetType, targetId, targetClientId, sessionId, offer, video }) => {
       if (u.type !== "employee") return;
-      io.to(`client:${targetClientId}`).emit("call:offer", {
+      const rt = targetType || "client"; // rétro-compat avec l'ancien payload { targetClientId }
+      const rid = targetId || targetClientId;
+      if (!["client", "guest"].includes(rt) || !rid) return;
+      io.to(`${rt}:${rid}`).emit("call:offer", {
         sessionId, offer, callerName: u.name || "Biborne", callerId: u.id, video: !!video,
       });
     });

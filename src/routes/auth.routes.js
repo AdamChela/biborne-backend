@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { Employee, Client, Conversation } = require("../models");
 const { sendVerificationEmail } = require("../utils/email");
+const { authMiddleware, employeeOnly } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -65,6 +66,14 @@ router.post("/employee/login", async (req, res) => {
       return res.status(401).json({ error: "Email ou mot de passe incorrect" });
     const token = makeToken({ id: emp.id, type: "employee", role: emp.role, name: emp.name });
     res.json({ token, employee: { id: emp.id, name: emp.name, email: emp.email, role: emp.role } });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Liste des collègues (pour les mentions @ dans les messages)
+router.get("/employees", authMiddleware, employeeOnly, async (req, res) => {
+  try {
+    const emps = await Employee.findAll({ attributes: ["id", "name"], order: [["name", "ASC"]] });
+    res.json(emps);
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 

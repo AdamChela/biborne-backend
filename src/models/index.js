@@ -47,15 +47,22 @@ const Message = sequelize.define("Message", {
   status:     { type: DataTypes.STRING, defaultValue: "sent" },
   callStatus: { type: DataTypes.STRING },
   guestName:  { type: DataTypes.STRING },
+  guestId:    { type: DataTypes.UUID },   // id du ConversationParticipant si envoyé par un invité
+  guestPhone: { type: DataTypes.STRING }, // téléphone de l'invité, dénormalisé comme guestName
+  mentions:   { type: DataTypes.TEXT },   // JSON.stringify([{type:"employee"|"guest", id, name}])
 });
 
 const CallSession = sequelize.define("CallSession", {
-  id:           { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  status:       { type: DataTypes.STRING, defaultValue: "ringing" },
-  type:         { type: DataTypes.STRING, defaultValue: "audio" }, // "audio" ou "video"
-  startedAt:    { type: DataTypes.DATE },
-  endedAt:      { type: DataTypes.DATE },
-  durationSecs: { type: DataTypes.INTEGER },
+  id:              { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  status:          { type: DataTypes.STRING, defaultValue: "ringing" },
+  type:            { type: DataTypes.STRING, defaultValue: "audio" }, // "audio" ou "video"
+  receiverType:    { type: DataTypes.STRING, defaultValue: "client" }, // "client" ou "guest"
+  // Pas de FK ici (contrairement à receiverId -> Client) : un invité vit dans ConversationParticipants,
+  // pas dans Clients, donc on le référence dans un champ libre pour ne pas casser la contrainte existante.
+  guestReceiverId: { type: DataTypes.UUID },
+  startedAt:       { type: DataTypes.DATE },
+  endedAt:         { type: DataTypes.DATE },
+  durationSecs:    { type: DataTypes.INTEGER },
 });
 
 const ConversationInvite = sequelize.define("ConversationInvite", {
@@ -70,6 +77,7 @@ const ConversationParticipant = sequelize.define("ConversationParticipant", {
   id:          { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   displayName: { type: DataTypes.STRING, allowNull: false },
   role:        { type: DataTypes.STRING, defaultValue: "employee" },
+  phone:       { type: DataTypes.STRING },
   // TEXT et non STRING : un token JWT dépasse souvent les 255 caractères de VARCHAR,
   // ce qui faisait échouer silencieusement la création (erreur 500 "Erreur serveur").
   guestToken:  { type: DataTypes.TEXT },

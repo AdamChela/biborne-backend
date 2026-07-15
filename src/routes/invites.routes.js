@@ -47,34 +47,40 @@ router.get("/join/:code", async (req, res) => {
 // Rejoindre (1 seule utilisation)
 router.post("/join/:code", async (req, res) => {
   try {
-    const { displayName, role } = req.body;
+    const { displayName, role, phone } = req.body;
     if (!displayName?.trim()) return res.status(400).json({ error: "Prénom requis" });
     if (!["manager","employee"].includes(role)) return res.status(400).json({ error: "Rôle invalide" });
+    if (!phone?.trim()) return res.status(400).json({ error: "Numéro de téléphone requis" });
 
     const invite = await ConversationInvite.findOne({ where: { code: req.params.code } });
     if (!invite) return res.status(404).json({ error: "Lien invalide" });
     if (invite.usedAt) return res.status(410).json({ error: "Ce lien a déjà été utilisé" });
     if (invite.expiresAt < new Date()) return res.status(410).json({ error: "Ce lien a expiré" });
 
-    // Marque comme utilisé immédiatement
+    // On crée d'abord le participant (sans token) pour obtenir son id : le token JWT a besoin
+    // de cet id afin que l'invité puisse rejoindre sa room d'appel personnelle (guest:<id>).
+    const participant = await ConversationParticipant.create({
+      conversationId: invite.conversationId,
+      displayName: displayName.trim(),
+      role,
+      phone: phone.trim(),
+    });
+
+    const guestToken = jwt.sign(
+      { type: "guest", id: participant.id, conversationId: invite.conversationId, displayName: displayName.trim(), role, phone: phone.trim() },
+      process.env.JWT_SECRET,
+      { expiresIn: "90d" }
+    );
+    participant.guestToken = guestToken;
+    await participant.save();
+
+    // On ne marque le lien "utilisé" qu'une fois l'invité effectivement créé avec succès :
+    // sinon une erreur imprévue grille le lien à usage unique sans que personne n'ait pu rejoindre.
     invite.usedAt = new Date();
     invite.usedBy = displayName.trim();
     await invite.save();
 
-    const guestToken = jwt.sign(
-      { type: "guest", conversationId: invite.conversationId, displayName: displayName.trim(), role },
-      process.env.JWT_SECRET,
-      { expiresIn: "90d" }
-    );
-
-    await ConversationParticipant.create({
-      conversationId: invite.conversationId,
-      displayName: displayName.trim(),
-      role,
-      guestToken,
-    });
-
-    res.json({ token: guestToken, participant: { displayName: displayName.trim(), role }, conversationId: invite.conversationId });
+    res.json({ token: guestToken, participant: { id: participant.id, displayName: displayName.trim(), role, phone: phone.trim() }, conversationId: invite.conversationId });
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 

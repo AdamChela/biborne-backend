@@ -1,5 +1,5 @@
 const express = require("express");
-const { Conversation, Client, Employee, Message, ConversationNote } = require("../models");
+const { Conversation, Client, Employee, Message, ConversationNote, ConversationParticipant } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
 
 const router = express.Router();
@@ -55,6 +55,25 @@ router.patch("/:id/ticket", employeeOnly, async (req, res) => {
     await conv.save();
     req.io?.emit("ticket_updated", { conversationId: conv.id, ticketStatus: conv.ticketStatus, ticketOwner: conv.ticketOwner });
     res.json(conv);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Liste de toutes les personnes présentes dans la conversation (client + invités via lien)
+router.get("/:id/participants", async (req, res) => {
+  try {
+    const conv = await Conversation.findByPk(req.params.id, { include: [Client] });
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable" });
+    const guests = await ConversationParticipant.findAll({
+      where: { conversationId: req.params.id },
+      attributes: ["id", "displayName", "role", "phone", "createdAt"],
+      order: [["createdAt", "ASC"]],
+    });
+    res.json({
+      client: conv.Client
+        ? { id: conv.Client.id, name: conv.Client.name, phone: conv.Client.phone, restaurantName: conv.Client.restaurantName }
+        : null,
+      guests,
+    });
   } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
