@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const { ConversationInvite, ConversationParticipant, Conversation, Client } = require("../models");
 const { authMiddleware } = require("../middleware/auth");
+const { alertError } = require("../utils/alert");
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ router.post("/:convId/invite", authMiddleware, async (req, res) => {
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
     await ConversationInvite.create({ conversationId: req.params.convId, code, expiresAt });
     res.json({ code, expiresAt });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Infos sur le lien
@@ -41,7 +42,7 @@ router.get("/join/:code", async (req, res) => {
       city: conv.Client?.city || "",
       expiresAt: invite.expiresAt,
     });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Rejoindre (1 seule utilisation)
@@ -81,7 +82,7 @@ router.post("/join/:code", async (req, res) => {
     await invite.save();
 
     res.json({ token: guestToken, participant: { id: participant.id, displayName: displayName.trim(), role, phone: phone.trim() }, conversationId: invite.conversationId });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 module.exports = router;

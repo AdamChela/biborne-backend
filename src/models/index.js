@@ -12,6 +12,9 @@ const Employee = sequelize.define("Employee", {
   password: { type: DataTypes.STRING, allowNull: false },
   role:     { type: DataTypes.STRING, defaultValue: "agent" },
   isOnline: { type: DataTypes.BOOLEAN, defaultValue: false },
+  canDelete: { type: DataTypes.BOOLEAN, defaultValue: false }, // autorisé à supprimer définitivement une conversation
+  resetCode:   { type: DataTypes.STRING }, // mot de passe oublié
+  resetExpiry: { type: DataTypes.DATE },
 });
 
 const Client = sequelize.define("Client", {
@@ -25,6 +28,8 @@ const Client = sequelize.define("Client", {
   verified:       { type: DataTypes.BOOLEAN, defaultValue: false },
   verifyCode:     { type: DataTypes.STRING },
   verifyExpiry:   { type: DataTypes.DATE },
+  resetCode:      { type: DataTypes.STRING }, // mot de passe oublié (distinct de verifyCode, pour ne pas interférer avec l'inscription)
+  resetExpiry:    { type: DataTypes.DATE },
 });
 
 const Conversation = sequelize.define("Conversation", {

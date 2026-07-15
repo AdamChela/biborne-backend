@@ -2,6 +2,7 @@ const express = require("express");
 const { Message, Conversation, Employee } = require("../models");
 const { upload } = require("../utils/upload");
 const { uploadBuffer } = require("../utils/cloudinary");
+const { alertError } = require("../utils/alert");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -51,7 +52,7 @@ router.get("/:convId", async (req, res) => {
       order: [["createdAt","ASC"]],
     });
     res.json(msgs);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Texte
@@ -72,7 +73,7 @@ router.post("/:convId/text", async (req, res) => {
     const payload = { ...full.toJSON(), clientMsgId: clientMsgId || null };
     emit(req.params.convId, req.user.type, payload);
     res.json(payload);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Média
@@ -92,7 +93,7 @@ router.post("/:convId/media", upload.single("file"), async (req, res) => {
     const payload = { ...full.toJSON(), clientMsgId: req.body.clientMsgId || null };
     emit(req.params.convId, req.user.type, payload);
     res.json(payload);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 module.exports = { router, setIo };

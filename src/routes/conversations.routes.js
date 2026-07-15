@@ -1,6 +1,7 @@
 const express = require("express");
-const { Conversation, Client, Employee, Message, ConversationNote, ConversationParticipant } = require("../models");
+const { Conversation, Client, Employee, Message, ConversationNote, ConversationParticipant, ConversationInvite } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
+const { alertError } = require("../utils/alert");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -15,7 +16,7 @@ router.get("/", async (req, res) => {
       order: [["updatedAt","DESC"]],
     });
     res.json(convs);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Créer une conversation (client)
@@ -27,7 +28,7 @@ router.post("/", async (req, res) => {
     if (!conv) conv = await Conversation.create({ clientId: req.user.id });
     const full = await Conversation.findByPk(conv.id, { include: [Client, Employee] });
     res.json(full);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Assigner un employé
@@ -38,7 +39,7 @@ router.patch("/:id/assign", employeeOnly, async (req, res) => {
     conv.employeeId = req.user.id;
     await conv.save();
     res.json(conv);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Mettre à jour le label/statut
@@ -55,7 +56,23 @@ router.patch("/:id/ticket", employeeOnly, async (req, res) => {
     await conv.save();
     req.io?.emit("ticket_updated", { conversationId: conv.id, ticketStatus: conv.ticketStatus, ticketOwner: conv.ticketOwner });
     res.json(conv);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Supprimer définitivement une conversation (réservé aux employés autorisés, voir Employee.canDelete)
+router.delete("/:id", employeeOnly, async (req, res) => {
+  try {
+    if (!req.user.canDelete) return res.status(403).json({ error: "Tu n'as pas la permission de supprimer une conversation" });
+    const conv = await Conversation.findByPk(req.params.id);
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable" });
+    await Message.destroy({ where: { conversationId: conv.id } });
+    await ConversationParticipant.destroy({ where: { conversationId: conv.id } });
+    await ConversationInvite.destroy({ where: { conversationId: conv.id } });
+    await ConversationNote.destroy({ where: { conversationId: conv.id } });
+    await conv.destroy();
+    req.io?.emit("conversation_deleted", { conversationId: req.params.id });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Liste de toutes les personnes présentes dans la conversation (client + invités via lien)
@@ -74,7 +91,7 @@ router.get("/:id/participants", async (req, res) => {
         : null,
       guests,
     });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Lire la note interne partagée d'une conversation
@@ -82,7 +99,7 @@ router.get("/:id/note", employeeOnly, async (req, res) => {
   try {
     const note = await ConversationNote.findOne({ where: { conversationId: req.params.id } });
     res.json(note || { content: "", updatedByName: null });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Mettre à jour (ou créer) la note interne partagée d'une conversation
@@ -97,7 +114,7 @@ router.put("/:id/note", employeeOnly, async (req, res) => {
     else { note.content = content; note.updatedByName = emp?.name; await note.save(); }
     req.io?.emit("note_updated", { conversationId: req.params.id, content: note.content, updatedByName: note.updatedByName });
     res.json(note);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 module.exports = router;

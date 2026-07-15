@@ -1,6 +1,7 @@
 const express = require("express");
 const { QuickReply } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
+const { alertError } = require("../utils/alert");
 
 const router = express.Router();
 router.use(authMiddleware, employeeOnly);
@@ -10,7 +11,7 @@ router.get("/", async (req, res) => {
   try {
     const replies = await QuickReply.findAll({ order: [["createdAt", "ASC"]] });
     res.json(replies);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Créer une réponse rapide
@@ -21,7 +22,7 @@ router.post("/", async (req, res) => {
     const reply = await QuickReply.create({ text: text.trim() });
     req.io?.emit("quick_reply_added", reply);
     res.json(reply);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 // Supprimer une réponse rapide
@@ -32,7 +33,7 @@ router.delete("/:id", async (req, res) => {
     await reply.destroy();
     req.io?.emit("quick_reply_deleted", { id: req.params.id });
     res.json({ ok: true });
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 module.exports = router;

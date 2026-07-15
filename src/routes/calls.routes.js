@@ -1,6 +1,7 @@
 const express = require("express");
 const { CallSession, Client, ConversationParticipant } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
+const { alertError } = require("../utils/alert");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -35,7 +36,7 @@ router.post("/", employeeOnly, async (req, res) => {
     });
     req.io?.to(room).emit("incoming_call", { sessionId: session.id, callerName: req.user.name || "Biborne" });
     res.json(session);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 router.patch("/:id", async (req, res) => {
@@ -50,7 +51,7 @@ router.patch("/:id", async (req, res) => {
     }
     await session.save();
     res.json(session);
-  } catch (e) { console.error(e); res.status(500).json({ error: "Erreur serveur" }); }
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
 module.exports = router;
