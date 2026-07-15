@@ -27,6 +27,7 @@ function buildMsg(req, convId, extra) {
     guestName:  req.user.type === "guest"    ? req.user.displayName : null,
     guestId:    req.user.type === "guest"    ? req.user.id : null,
     guestPhone: req.user.type === "guest"    ? req.user.phone : null,
+    guestRole:  req.user.type === "guest"    ? req.user.role : null,
     ...extra,
   };
 }

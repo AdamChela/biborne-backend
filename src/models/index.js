@@ -49,6 +49,7 @@ const Message = sequelize.define("Message", {
   guestName:  { type: DataTypes.STRING },
   guestId:    { type: DataTypes.UUID },   // id du ConversationParticipant si envoyé par un invité
   guestPhone: { type: DataTypes.STRING }, // téléphone de l'invité, dénormalisé comme guestName
+  guestRole:  { type: DataTypes.STRING }, // "employee" ou "manager", dénormalisé comme guestName
   mentions:   { type: DataTypes.TEXT },   // JSON.stringify([{type:"employee"|"guest", id, name}])
 });
 
