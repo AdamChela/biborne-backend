@@ -78,7 +78,8 @@ router.get("/employees", authMiddleware, employeeOnly, async (req, res) => {
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
-// ── MOT DE PASSE OUBLIE (employé ou client) ─────────────────────────────────────
+// ── MOT DE PASSE OUBLIE (clients uniquement) ────────────────────────────────────
+// Les employés ont un mot de passe fixe partagé, géré manuellement : pas de self-service pour eux.
 // Demande d'un code de réinitialisation, envoyé par email (valable 15 min).
 router.post("/forgot-password", async (req, res) => {
   try {
@@ -88,18 +89,11 @@ router.post("/forgot-password", async (req, res) => {
     const code = randomCode();
     const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
-    const emp = await Employee.findOne({ where: { email } });
-    if (emp) {
-      emp.resetCode = code; emp.resetExpiry = expiry;
-      await emp.save();
-      await sendPasswordResetEmail(email, emp.name, code);
-    } else {
-      const client = await Client.findOne({ where: { email } });
-      if (client) {
-        client.resetCode = code; client.resetExpiry = expiry;
-        await client.save();
-        await sendPasswordResetEmail(email, client.name, code);
-      }
+    const client = await Client.findOne({ where: { email } });
+    if (client) {
+      client.resetCode = code; client.resetExpiry = expiry;
+      await client.save();
+      await sendPasswordResetEmail(email, client.name, code);
     }
     // Réponse volontairement identique que le compte existe ou non : on ne révèle jamais
     // si un email est associé à un compte (bonne pratique de sécurité).
@@ -113,16 +107,6 @@ router.post("/reset-password", async (req, res) => {
     const { email, code, newPassword } = req.body;
     if (!email || !code || !newPassword) return res.status(400).json({ error: "Champs manquants" });
     if (newPassword.length < 6) return res.status(400).json({ error: "Mot de passe trop court (6 caractères minimum)" });
-
-    const emp = await Employee.findOne({ where: { email } });
-    if (emp) {
-      if (!emp.resetCode || emp.resetCode !== code) return res.status(400).json({ error: "Code incorrect" });
-      if (!emp.resetExpiry || new Date() > new Date(emp.resetExpiry)) return res.status(400).json({ error: "Code expiré" });
-      emp.password = await bcrypt.hash(newPassword, 10);
-      emp.resetCode = null; emp.resetExpiry = null;
-      await emp.save();
-      return res.json({ message: "Mot de passe mis à jour" });
-    }
 
     const client = await Client.findOne({ where: { email } });
     if (client) {

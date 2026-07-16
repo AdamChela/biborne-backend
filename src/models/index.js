@@ -13,8 +13,8 @@ const Employee = sequelize.define("Employee", {
   role:     { type: DataTypes.STRING, defaultValue: "agent" },
   isOnline: { type: DataTypes.BOOLEAN, defaultValue: false },
   canDelete: { type: DataTypes.BOOLEAN, defaultValue: false }, // autorisé à supprimer définitivement une conversation
-  resetCode:   { type: DataTypes.STRING }, // mot de passe oublié
-  resetExpiry: { type: DataTypes.DATE },
+  // Pas de resetCode/resetExpiry ici : le mot de passe employé est fixe et géré manuellement,
+  // pas de self-service "mot de passe oublié" pour les employés (voir Client plus bas).
 });
 
 const Client = sequelize.define("Client", {
