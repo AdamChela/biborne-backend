@@ -30,6 +30,10 @@ const Client = sequelize.define("Client", {
   verifyExpiry:   { type: DataTypes.DATE },
   resetCode:      { type: DataTypes.STRING }, // mot de passe oublié (distinct de verifyCode, pour ne pas interférer avec l'inscription)
   resetExpiry:    { type: DataTypes.DATE },
+  // Validation manuelle par un employé Biborne : empêche n'importe qui (ex: quelqu'un qui installe
+  // l'appli depuis le Play Store sans être un vrai client) d'accéder au chat après inscription.
+  // L'email vérifié (verified) ne suffit pas : ça prouve juste que l'email existe.
+  approved:       { type: DataTypes.BOOLEAN, defaultValue: false },
 });
 
 const Conversation = sequelize.define("Conversation", {
@@ -37,6 +41,8 @@ const Conversation = sequelize.define("Conversation", {
   status:       { type: DataTypes.STRING, defaultValue: "open" },
   ticketStatus: { type: DataTypes.STRING, defaultValue: "todo" },
   ticketOwner:  { type: DataTypes.STRING },
+  // Nom du "groupe" personnalisable par un employé, prioritaire sur le nom du restaurant du client.
+  displayName:  { type: DataTypes.STRING },
 });
 
 const Message = sequelize.define("Message", {

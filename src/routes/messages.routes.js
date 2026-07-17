@@ -1,5 +1,5 @@
 const express = require("express");
-const { Message, Conversation, Employee } = require("../models");
+const { Message, Conversation, Employee, Client } = require("../models");
 const { upload } = require("../utils/upload");
 const { uploadBuffer } = require("../utils/cloudinary");
 const { alertError } = require("../utils/alert");
@@ -16,6 +16,17 @@ router.use((req, res, next) => {
     next();
   } catch { res.status(401).json({ error: "Token invalide" }); }
 });
+
+// Empêche un client non encore validé par un employé d'envoyer des messages (voir Client.approved).
+// Vérifié en base à chaque envoi (pas dans le JWT) pour prendre effet immédiatement après validation.
+async function blockUnapprovedClient(req, res, next) {
+  if (req.user.type !== "client") return next();
+  try {
+    const client = await Client.findByPk(req.user.id);
+    if (!client?.approved) return res.status(403).json({ error: "Ton compte est en attente de validation par l'équipe Biborne.", needsApproval: true });
+    next();
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
+}
 
 let io = null;
 function setIo(instance) { io = instance; }
@@ -56,7 +67,7 @@ router.get("/:convId", async (req, res) => {
 });
 
 // Texte
-router.post("/:convId/text", async (req, res) => {
+router.post("/:convId/text", blockUnapprovedClient, async (req, res) => {
   try {
     const { content, clientMsgId, mentions } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: "Message vide" });
@@ -77,7 +88,7 @@ router.post("/:convId/text", async (req, res) => {
 });
 
 // Média
-router.post("/:convId/media", upload.single("file"), async (req, res) => {
+router.post("/:convId/media", blockUnapprovedClient, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Aucun fichier reçu" });
     // Stockage permanent sur Cloudinary (le disque de Render est effacé à chaque déploiement).

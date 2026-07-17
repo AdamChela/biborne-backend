@@ -59,6 +59,34 @@ router.patch("/:id/ticket", employeeOnly, async (req, res) => {
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
+// Valider un client (bloqué par défaut après inscription, voir Client.approved) : lui donne accès au chat.
+router.patch("/:id/approve-client", employeeOnly, async (req, res) => {
+  try {
+    const conv = await Conversation.findByPk(req.params.id, { include: [Client] });
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable" });
+    if (!conv.Client) return res.status(400).json({ error: "Cette conversation n'a pas de client associé" });
+    conv.Client.approved = true;
+    await conv.Client.save();
+    // Prévient le client (s'il attend sur l'écran de validation) et les autres employés (pour retirer le badge).
+    req.io?.to(`client:${conv.Client.id}`).emit("client_approved", { conversationId: conv.id });
+    req.io?.emit("client_approved_broadcast", { conversationId: conv.id });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Renommer le "groupe" (titre affiché de la conversation, prioritaire sur le nom du restaurant)
+router.patch("/:id/name", employeeOnly, async (req, res) => {
+  try {
+    const { displayName } = req.body;
+    const conv = await Conversation.findByPk(req.params.id);
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable" });
+    conv.displayName = displayName?.trim() || null;
+    await conv.save();
+    req.io?.emit("conversation_renamed", { conversationId: conv.id, displayName: conv.displayName });
+    res.json(conv);
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
 // Supprimer définitivement une conversation (réservé aux employés autorisés, voir Employee.canDelete)
 router.delete("/:id", employeeOnly, async (req, res) => {
   try {

@@ -38,7 +38,7 @@ router.post("/login", async (req, res) => {
       const token = makeToken({ id: client.id, type: "client" });
       return res.json({
         type: "client", token,
-        client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city },
+        client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city, approved: !!client.approved },
         conversationId: conv.id,
       });
     }
@@ -172,7 +172,7 @@ router.post("/client/verify", async (req, res) => {
 
     res.json({
       token,
-      client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city },
+      client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city, approved: !!client.approved },
       conversationId: conv.id,
     });
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
@@ -194,7 +194,7 @@ router.post("/client/login", async (req, res) => {
     const token = makeToken({ id: client.id, type: "client" });
     res.json({
       token,
-      client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city },
+      client: { id: client.id, name: client.name, email: client.email, phone: client.phone, restaurantName: client.restaurantName, city: client.city, approved: !!client.approved },
       conversationId: conv.id,
     });
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
