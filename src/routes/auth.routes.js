@@ -5,8 +5,13 @@ const { Employee, Client, Conversation } = require("../models");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
 const { alertError } = require("../utils/alert");
+const { rateLimit } = require("../middleware/rateLimit");
 
 const router = express.Router();
+
+// Limite les tentatives de connexion / devinette de code à 10 par IP toutes les 15 min
+// (empêche le brute force sur les mots de passe et les codes à 6 chiffres).
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 function makeToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "90d" });
@@ -17,7 +22,7 @@ function randomCode() {
 
 // ── CONNEXION UNIFIEE (PWA) ─────────────────────────────────────────────────────
 // Détecte automatiquement s'il s'agit d'un employé ou d'un client à partir de l'email.
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email et mot de passe requis" });
@@ -48,7 +53,10 @@ router.post("/login", async (req, res) => {
 });
 
 // ── EMPLOYES ──────────────────────────────────────────────────────────────────
-router.post("/employee/register", async (req, res) => {
+// Réservé aux employés déjà connectés : sans ça, n'importe qui sur internet pourrait se créer
+// un compte employé et voir toutes les conversations. Pour créer un nouveau collègue, utilise
+// le Bearer token d'un employé existant (ex: le tien) sur cette route.
+router.post("/employee/register", authMiddleware, employeeOnly, async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "Champs manquants" });
@@ -59,7 +67,7 @@ router.post("/employee/register", async (req, res) => {
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
-router.post("/employee/login", async (req, res) => {
+router.post("/employee/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     const emp = await Employee.findOne({ where: { email } });
@@ -81,7 +89,7 @@ router.get("/employees", authMiddleware, employeeOnly, async (req, res) => {
 // ── MOT DE PASSE OUBLIE (clients uniquement) ────────────────────────────────────
 // Les employés ont un mot de passe fixe partagé, géré manuellement : pas de self-service pour eux.
 // Demande d'un code de réinitialisation, envoyé par email (valable 15 min).
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email requis" });
@@ -102,7 +110,7 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 // Réinitialisation effective avec le code reçu par email.
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", authLimiter, async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
     if (!email || !code || !newPassword) return res.status(400).json({ error: "Champs manquants" });
@@ -125,7 +133,7 @@ router.post("/reset-password", async (req, res) => {
 // ── CLIENTS ───────────────────────────────────────────────────────────────────
 
 // Étape 1 : Inscription → envoie le code par email
-router.post("/client/register", async (req, res) => {
+router.post("/client/register", authLimiter, async (req, res) => {
   try {
     const { name, email, phone, password, restaurantName, city } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "Nom, email et mot de passe requis" });
@@ -152,7 +160,7 @@ router.post("/client/register", async (req, res) => {
 });
 
 // Étape 2 : Vérification du code → active le compte + crée la conversation permanente
-router.post("/client/verify", async (req, res) => {
+router.post("/client/verify", authLimiter, async (req, res) => {
   try {
     const { email, code } = req.body;
     const client = await Client.findOne({ where: { email } });
@@ -179,7 +187,7 @@ router.post("/client/verify", async (req, res) => {
 });
 
 // Connexion client (email + mot de passe)
-router.post("/client/login", async (req, res) => {
+router.post("/client/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email et mot de passe requis" });
@@ -201,7 +209,7 @@ router.post("/client/login", async (req, res) => {
 });
 
 // Renvoyer le code
-router.post("/client/resend-code", async (req, res) => {
+router.post("/client/resend-code", authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const client = await Client.findOne({ where: { email } });

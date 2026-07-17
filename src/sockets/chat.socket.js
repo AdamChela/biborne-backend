@@ -39,8 +39,19 @@ function setupSocket(io) {
       if (u.id) socket.join(`guest:${u.id}`);
     }
 
-    // Rejoindre une room manuellement (employé ouvre une conversation)
-    socket.on("join_conversation", (id) => socket.join(id));
+    // Rejoindre une room manuellement (employé ouvre une conversation). On vérifie que le client/invité
+    // qui le demande a bien le droit d'être dans CETTE conversation (sinon il pourrait écouter en direct
+    // les messages d'une autre conversation juste en connaissant/devinant son ID).
+    socket.on("join_conversation", async (id) => {
+      if (u.type === "employee") return socket.join(id);
+      if (u.type === "guest") { if (u.conversationId === id) socket.join(id); return; }
+      if (u.type === "client") {
+        try {
+          const conv = await Conversation.findByPk(id);
+          if (conv && conv.clientId === u.id) socket.join(id);
+        } catch (e) { console.error("[Socket] Erreur join_conversation:", e.message); }
+      }
+    });
     socket.on("leave_conversation", (id) => socket.leave(id));
 
     // Indicateur de frappe

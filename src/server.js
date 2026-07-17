@@ -14,8 +14,12 @@ const { router: messagesRouter, setIo } = require("./routes/messages.routes");
 const callsRoutes         = require("./routes/calls.routes");
 const invitesRoutes       = require("./routes/invites.routes");
 const quickRepliesRoutes  = require("./routes/quick-replies.routes");
+const pushRoutes          = require("./routes/push.routes");
 
 const app = express();
+// Render est derrière un proxy : sans ça, req.ip renvoie toujours l'IP interne du proxy,
+// ce qui casse le limiteur de tentatives (rate limit) basé sur l'IP du vrai visiteur.
+app.set("trust proxy", 1);
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
@@ -36,6 +40,7 @@ app.use("/api/messages",      messagesRouter);
 app.use("/api/calls",         callsRoutes);
 app.use("/api/invites",       invitesRoutes);
 app.use("/api/quick-replies", quickRepliesRoutes);
+app.use("/api/push",          pushRoutes);
 
 setupSocket(io);
 

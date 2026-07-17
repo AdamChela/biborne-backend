@@ -1,7 +1,9 @@
 const express = require("express");
-const { Conversation, Client, Employee, Message, ConversationNote, ConversationParticipant, ConversationInvite } = require("../models");
+const { Op } = require("sequelize");
+const { Conversation, Client, Employee, Message, ConversationNote, ConversationParticipant, ConversationInvite, sequelize } = require("../models");
 const { authMiddleware, employeeOnly } = require("../middleware/auth");
 const { alertError } = require("../utils/alert");
+const { sameConversationOnly } = require("../middleware/convAccess");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -16,6 +18,41 @@ router.get("/", async (req, res) => {
       order: [["updatedAt","DESC"]],
     });
     res.json(convs);
+  } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
+});
+
+// Recherche employé : par nom/restaurant/ville/groupe ET par contenu des messages (pas juste les métadonnées).
+router.get("/search", employeeOnly, async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (!q) return res.json([]);
+    const op = sequelize.getDialect() === "postgres" ? Op.iLike : Op.like;
+    const like = { [op]: `%${q}%` };
+
+    const clients = await Client.findAll({ where: { [Op.or]: [{ name: like }, { restaurantName: like }, { city: like }] }, attributes: ["id"] });
+    const clientIds = clients.map(c => c.id);
+
+    const msgs = await Message.findAll({
+      where: { content: like, deletedAt: null },
+      attributes: ["conversationId", "content"],
+      order: [["createdAt", "DESC"]],
+      limit: 300,
+    });
+    const snippetByConv = {};
+    msgs.forEach(m => { if (!snippetByConv[m.conversationId]) snippetByConv[m.conversationId] = m.content; });
+
+    const orClauses = [{ displayName: like }];
+    if (clientIds.length) orClauses.push({ clientId: clientIds });
+    const msgConvIds = Object.keys(snippetByConv);
+    if (msgConvIds.length) orClauses.push({ id: msgConvIds });
+
+    const convs = await Conversation.findAll({
+      where: { [Op.or]: orClauses },
+      include: [Client, Employee],
+      order: [["updatedAt", "DESC"]],
+      limit: 50,
+    });
+    res.json(convs.map(c => ({ ...c.toJSON(), matchSnippet: snippetByConv[c.id] || null })));
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 
@@ -104,7 +141,7 @@ router.delete("/:id", employeeOnly, async (req, res) => {
 });
 
 // Liste de toutes les personnes présentes dans la conversation (client + invités via lien)
-router.get("/:id/participants", async (req, res) => {
+router.get("/:id/participants", sameConversationOnly, async (req, res) => {
   try {
     const conv = await Conversation.findByPk(req.params.id, { include: [Client] });
     if (!conv) return res.status(404).json({ error: "Conversation introuvable" });

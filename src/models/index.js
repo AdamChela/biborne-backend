@@ -43,6 +43,9 @@ const Conversation = sequelize.define("Conversation", {
   ticketOwner:  { type: DataTypes.STRING },
   // Nom du "groupe" personnalisable par un employé, prioritaire sur le nom du restaurant du client.
   displayName:  { type: DataTypes.STRING },
+  // true dès qu'un client/invité envoie un message ; repassé à false quand un employé ouvre la
+  // conversation (voir POST /api/messages/:convId/read). Sert au badge "non lu" côté employé.
+  unreadForEmployees: { type: DataTypes.BOOLEAN, defaultValue: false },
 });
 
 const Message = sequelize.define("Message", {
@@ -55,13 +58,15 @@ const Message = sequelize.define("Message", {
   mimeType:   { type: DataTypes.STRING },
   fileSize:   { type: DataTypes.INTEGER },
   duration:   { type: DataTypes.INTEGER },
-  status:     { type: DataTypes.STRING, defaultValue: "sent" },
+  status:     { type: DataTypes.STRING, defaultValue: "sent" }, // "sent" -> "read"
   callStatus: { type: DataTypes.STRING },
   guestName:  { type: DataTypes.STRING },
   guestId:    { type: DataTypes.UUID },   // id du ConversationParticipant si envoyé par un invité
   guestPhone: { type: DataTypes.STRING }, // téléphone de l'invité, dénormalisé comme guestName
   guestRole:  { type: DataTypes.STRING }, // "employee" ou "manager", dénormalisé comme guestName
   mentions:   { type: DataTypes.TEXT },   // JSON.stringify([{type:"employee"|"guest", id, name}])
+  edited:     { type: DataTypes.BOOLEAN, defaultValue: false },
+  deletedAt:  { type: DataTypes.DATE }, // suppression "douce" : on garde la ligne, on masque le contenu à l'affichage
 });
 
 const CallSession = sequelize.define("CallSession", {
@@ -108,6 +113,17 @@ const QuickReply = sequelize.define("QuickReply", {
   text: { type: DataTypes.TEXT, allowNull: false },
 });
 
+// Abonnement aux notifications push du navigateur (PWA). Un même compte peut avoir plusieurs
+// abonnements (plusieurs appareils/navigateurs) : pas de unique sur ownerId, seulement sur endpoint.
+const PushSubscription = sequelize.define("PushSubscription", {
+  id:        { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  ownerType: { type: DataTypes.STRING, allowNull: false }, // "employee" | "client" | "guest"
+  ownerId:   { type: DataTypes.STRING, allowNull: false },
+  endpoint:  { type: DataTypes.TEXT, allowNull: false, unique: true },
+  p256dh:    { type: DataTypes.STRING, allowNull: false },
+  auth:      { type: DataTypes.STRING, allowNull: false },
+});
+
 // Relations
 Client.hasMany(Conversation, { foreignKey: "clientId" });
 Conversation.belongsTo(Client, { foreignKey: "clientId" });
@@ -130,4 +146,4 @@ ConversationParticipant.belongsTo(Conversation, { foreignKey: "conversationId" }
 Conversation.hasOne(ConversationNote, { foreignKey: "conversationId" });
 ConversationNote.belongsTo(Conversation, { foreignKey: "conversationId" });
 
-module.exports = { sequelize, Employee, Client, Conversation, Message, CallSession, ConversationInvite, ConversationParticipant, ConversationNote, QuickReply };
+module.exports = { sequelize, Employee, Client, Conversation, Message, CallSession, ConversationInvite, ConversationParticipant, ConversationNote, QuickReply, PushSubscription };
