@@ -64,7 +64,9 @@ async function notifyPush(convId, senderType, msg) {
     const conv = await Conversation.findByPk(convId);
     if (!conv) return;
     const typeLabels = { image: "📷 Photo", video: "🎬 Vidéo", audio: "🎤 Message vocal", file: "📎 Fichier" };
-    const preview = msg.type === "text" ? (msg.content || "").slice(0, 120) : (typeLabels[msg.type] || "Nouveau message");
+    const preview = msg.type === "text" ? (msg.content || "").slice(0, 120)
+      : msg.content ? `${typeLabels[msg.type] || "Fichier"} — ${msg.content}`.slice(0, 120) // légende éventuelle
+      : (typeLabels[msg.type] || "Nouveau message");
     const senderName = senderType === "employee" ? (msg.Employee?.name || "Biborne")
       : senderType === "client" ? (conv.displayName || "Client")
       : (msg.guestName || "Invité");
@@ -136,11 +138,13 @@ router.post("/:convId/media", sameConversationOnly, blockUnapprovedClient, uploa
     if (!req.file) return res.status(400).json({ error: "Aucun fichier reçu" });
     // Stockage permanent sur Cloudinary (le disque de Render est effacé à chaque déploiement).
     const uploaded = await uploadBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const caption = (req.body.content || "").trim();
     const msg = await Message.create(buildMsg(req, req.params.convId, {
       type: req.body.type || "file",
       fileUrl: uploaded.secure_url,
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
+      content: caption || null, // légende optionnelle (comme WhatsApp), affichée sous la photo/vidéo
     }));
     const convUpdate = { updatedAt: new Date() };
     if (req.user.type !== "employee") convUpdate.unreadForEmployees = true;
