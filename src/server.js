@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 const { Server } = require("socket.io");
 const { sequelize, Employee } = require("./models");
 const setupSocket = require("./sockets/chat.socket");
@@ -48,16 +49,32 @@ app.use("/api/push",          pushRoutes);
 
 setupSocket(io);
 
-// Employés autorisés à supprimer définitivement une conversation (voir routes/conversations.routes.js).
-// Réappliqué à chaque démarrage : idempotent, et couvre aussi un futur nouvel employé qu'on ajouterait ici.
-const DELETE_ALLOWED_EMAILS = ["adam@biborne.com", "samy@biborne.com", "sofiane@biborne.com", "fouzi@biborne.com"];
+// Équipe Biborne : identifiants unifiés (prenom@biborne.com + mot de passe partagé). Recréés/alignés
+// à chaque démarrage du serveur (idempotent, voir ensureBiborneTeam ci-dessous) : pratique pour ne
+// jamais avoir à se souvenir de qui a quel mot de passe, et couvre aussi un compte déjà existant
+// dont le mot de passe aurait été oublié — il est réaligné sur le mot de passe partagé au redémarrage.
+const BIBORNE_TEAM = ["Samy", "Adam", "Marwane", "Salem", "Toufik", "Fouzi", "Safir", "Badreddine", "Sofiane", "Abdelnoor"];
+const SHARED_PASSWORD = "Atmosphere@2026!";
+
+// Tous les employés Biborne ont les mêmes droits (pas de hiérarchie admin distincte dans cette app) :
+// crée les comptes de l'équipe s'ils n'existent pas, aligne leur mot de passe/droits sinon, puis
+// s'assure que canDelete est activé pour absolument tous les employés (y compris ceux hors de cette liste).
+async function ensureBiborneTeam() {
+  const hash = await bcrypt.hash(SHARED_PASSWORD, 10);
+  for (const name of BIBORNE_TEAM) {
+    const email = `${name.toLowerCase()}@biborne.com`;
+    const [emp] = await Employee.findOrCreate({ where: { email }, defaults: { name, email, password: hash, canDelete: true } });
+    await emp.update({ name, password: hash, canDelete: true });
+  }
+  await Employee.update({ canDelete: true }, { where: {} });
+}
 
 async function start() {
   await sequelize.sync({ alter: true });
   console.log("Base de donnees synchronisee");
   try {
-    await Employee.update({ canDelete: true }, { where: { email: DELETE_ALLOWED_EMAILS } });
-  } catch (e) { console.error("[Startup] Erreur mise à jour canDelete:", e.message); }
+    await ensureBiborneTeam();
+  } catch (e) { console.error("[Startup] Erreur création/alignement équipe Biborne:", e.message); }
   const PORT = process.env.PORT || 4000;
   server.listen(PORT, () => console.log(`Serveur Biborne Messagerie demarre sur le port ${PORT}`));
 }

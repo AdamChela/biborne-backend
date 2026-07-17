@@ -12,7 +12,10 @@ const Employee = sequelize.define("Employee", {
   password: { type: DataTypes.STRING, allowNull: false },
   role:     { type: DataTypes.STRING, defaultValue: "agent" },
   isOnline: { type: DataTypes.BOOLEAN, defaultValue: false },
-  canDelete: { type: DataTypes.BOOLEAN, defaultValue: false }, // autorisé à supprimer définitivement une conversation
+  // Autorisé à supprimer définitivement une conversation. Tous les employés Biborne ont les mêmes
+  // droits (pas de hiérarchie admin distincte dans cette app) : true par défaut, voir server.js
+  // pour l'alignement automatique de tous les comptes existants au démarrage.
+  canDelete: { type: DataTypes.BOOLEAN, defaultValue: true },
   // Pas de resetCode/resetExpiry ici : le mot de passe employé est fixe et géré manuellement,
   // pas de self-service "mot de passe oublié" pour les employés (voir Client plus bas).
 });
