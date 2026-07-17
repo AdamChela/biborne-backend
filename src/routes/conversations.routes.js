@@ -88,7 +88,8 @@ router.patch("/:id/assign", employeeOnly, async (req, res) => {
 router.patch("/:id/ticket", employeeOnly, async (req, res) => {
   try {
     const { ticketStatus } = req.body;
-    const allowed = ["todo","in_progress","done","waiting","urgent"];
+    // Binaire uniquement : "à faire" ou "fait" (pas d'état intermédiaire "en cours").
+    const allowed = ["todo","done"];
     if (!allowed.includes(ticketStatus)) return res.status(400).json({ error: "Statut invalide" });
     const conv = await Conversation.findByPk(req.params.id);
     if (!conv) return res.status(404).json({ error: "Conversation introuvable" });

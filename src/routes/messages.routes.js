@@ -34,6 +34,19 @@ async function blockUnapprovedClient(req, res, next) {
 let io = null;
 function setIo(instance) { io = instance; }
 
+// Si un client/invité répond sur une conversation marquée "Fait", elle repasse automatiquement
+// en "Pas fait" (elle se reclasse dans le filtre "Pas fait") — une conversation "faite" qui reçoit
+// une nouvelle demande n'est plus faite. Les employés ne déclenchent jamais ce repassage automatique
+// (sinon leur propre réponse "Fait" serait immédiatement annulée par leur message de confirmation).
+async function maybeRevertTicket(req, convId, convUpdate) {
+  if (req.user.type === "employee") return;
+  const conv = await Conversation.findByPk(convId, { attributes: ["id", "ticketStatus"] });
+  if (conv && conv.ticketStatus === "done") {
+    convUpdate.ticketStatus = "todo";
+    convUpdate.ticketOwner = null;
+  }
+}
+
 function buildMsg(req, convId, extra) {
   return {
     conversationId: convId,
@@ -119,6 +132,7 @@ router.post("/:convId/text", sameConversationOnly, blockUnapprovedClient, async 
     }));
     const convUpdate = { updatedAt: new Date() };
     if (req.user.type !== "employee") convUpdate.unreadForEmployees = true;
+    await maybeRevertTicket(req, req.params.convId, convUpdate);
     await Conversation.update(convUpdate, { where: { id: req.params.convId } });
     const full = await Message.findByPk(msg.id, { include: [{ model: Employee, attributes: ["id", "name"] }] });
     // clientMsgId permet à l'expéditeur de faire correspondre l'aperçu optimiste affiché
@@ -127,6 +141,7 @@ router.post("/:convId/text", sameConversationOnly, blockUnapprovedClient, async 
     const payload = { ...full.toJSON(), clientMsgId: clientMsgId || null };
     emit(req.params.convId, req.user.type, payload);
     if (convUpdate.unreadForEmployees) io?.to("employees").emit("conversation_unread_changed", { conversationId: req.params.convId, unread: true });
+    if (convUpdate.ticketStatus) io?.emit("ticket_updated", { conversationId: req.params.convId, ticketStatus: convUpdate.ticketStatus, ticketOwner: convUpdate.ticketOwner });
     notifyPush(req.params.convId, req.user.type, full.toJSON()).catch(() => {});
     res.json(payload);
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
@@ -153,11 +168,13 @@ router.post("/:convId/media", sameConversationOnly, blockUnapprovedClient, uploa
     }));
     const convUpdate = { updatedAt: new Date() };
     if (req.user.type !== "employee") convUpdate.unreadForEmployees = true;
+    await maybeRevertTicket(req, req.params.convId, convUpdate);
     await Conversation.update(convUpdate, { where: { id: req.params.convId } });
     const full = await Message.findByPk(msg.id, { include: [{ model: Employee, attributes: ["id", "name"] }] });
     const payload = { ...full.toJSON(), clientMsgId: req.body.clientMsgId || null };
     emit(req.params.convId, req.user.type, payload);
     if (convUpdate.unreadForEmployees) io?.to("employees").emit("conversation_unread_changed", { conversationId: req.params.convId, unread: true });
+    if (convUpdate.ticketStatus) io?.emit("ticket_updated", { conversationId: req.params.convId, ticketStatus: convUpdate.ticketStatus, ticketOwner: convUpdate.ticketOwner });
     notifyPush(req.params.convId, req.user.type, full.toJSON()).catch(() => {});
     res.json(payload);
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
