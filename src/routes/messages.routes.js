@@ -147,6 +147,9 @@ router.post("/:convId/media", sameConversationOnly, blockUnapprovedClient, uploa
       mimeType: req.file.mimetype,
       content: caption || null, // légende optionnelle (comme WhatsApp), affichée sous la photo/vidéo
       duration: Number.isFinite(durationSecs) ? durationSecs : null, // durée d'un message vocal, en secondes
+      // Gardés pour permettre la suppression automatique du fichier après 30 jours (voir utils/mediaCleanup.js)
+      cloudinaryPublicId: uploaded.public_id || null,
+      cloudinaryResourceType: uploaded.resource_type || null,
     }));
     const convUpdate = { updatedAt: new Date() };
     if (req.user.type !== "employee") convUpdate.unreadForEmployees = true;

@@ -23,4 +23,21 @@ function uploadBuffer(buffer, originalname, mimetype) {
   });
 }
 
-module.exports = { cloudinary, uploadBuffer };
+// Supprime un fichier sur Cloudinary (utilisé par le nettoyage automatique après 30 jours,
+// voir utils/mediaCleanup.js). resourceType doit correspondre à celui utilisé à l'upload
+// ("image"/"video"/"raw"), sinon Cloudinary ne retrouve pas le fichier.
+function deleteAsset(publicId, resourceType) {
+  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType || "image" });
+}
+
+// Pour les fichiers envoyés avant l'ajout des colonnes cloudinaryPublicId/cloudinaryResourceType :
+// on retrouve ces informations en parsant l'URL Cloudinary elle-même (format prévisible).
+// Renvoie null si l'URL ne ressemble pas à une URL Cloudinary.
+function extractCloudinaryInfoFromUrl(url) {
+  if (!url) return null;
+  const m = url.match(/\/(image|video|raw)\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/);
+  if (!m) return null;
+  return { resourceType: m[1], publicId: m[2] };
+}
+
+module.exports = { cloudinary, uploadBuffer, deleteAsset, extractCloudinaryInfoFromUrl };

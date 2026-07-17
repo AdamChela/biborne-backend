@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 const { sequelize, Employee } = require("./models");
 const setupSocket = require("./sockets/chat.socket");
 const { maybeRunSupervision } = require("./utils/supervision");
+const { maybeRunMediaCleanup, setIo: setMediaCleanupIo } = require("./utils/mediaCleanup");
 
 const authRoutes          = require("./routes/auth.routes");
 const conversationsRoutes = require("./routes/conversations.routes");
@@ -30,8 +31,11 @@ app.use((req, res, next) => { req.io = io; next(); });
 // Supervision "opportuniste" : profite du trafic réel entrant pour vérifier périodiquement
 // des anomalies (voir utils/supervision.js), sans jamais ralentir la requête en cours.
 app.use((req, res, next) => { next(); maybeRunSupervision(); });
+// Même principe pour la suppression automatique des médias de plus de 30 jours (voir utils/mediaCleanup.js).
+app.use((req, res, next) => { next(); maybeRunMediaCleanup(); });
 
 setIo(io);
+setMediaCleanupIo(io);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 app.use("/api/auth",          authRoutes);

@@ -58,6 +58,13 @@ const Message = sequelize.define("Message", {
   mimeType:   { type: DataTypes.STRING },
   fileSize:   { type: DataTypes.INTEGER },
   duration:   { type: DataTypes.INTEGER },
+  // Identifiants Cloudinary du fichier (nécessaires pour pouvoir le supprimer côté Cloudinary,
+  // pas juste effacer l'URL en base). Voir utils/mediaCleanup.js.
+  cloudinaryPublicId:     { type: DataTypes.STRING },
+  cloudinaryResourceType: { type: DataTypes.STRING }, // "image" | "video" | "raw"
+  // true une fois le fichier auto-supprimé après 30 jours (voir utils/mediaCleanup.js) :
+  // le message reste dans l'historique mais affiche "Média expiré" à la place du contenu.
+  mediaExpired: { type: DataTypes.BOOLEAN, defaultValue: false },
   status:     { type: DataTypes.STRING, defaultValue: "sent" }, // "sent" -> "read"
   callStatus: { type: DataTypes.STRING },
   guestName:  { type: DataTypes.STRING },
