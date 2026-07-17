@@ -139,12 +139,14 @@ router.post("/:convId/media", sameConversationOnly, blockUnapprovedClient, uploa
     // Stockage permanent sur Cloudinary (le disque de Render est effacé à chaque déploiement).
     const uploaded = await uploadBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
     const caption = (req.body.content || "").trim();
+    const durationSecs = parseInt(req.body.duration, 10);
     const msg = await Message.create(buildMsg(req, req.params.convId, {
       type: req.body.type || "file",
       fileUrl: uploaded.secure_url,
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
       content: caption || null, // légende optionnelle (comme WhatsApp), affichée sous la photo/vidéo
+      duration: Number.isFinite(durationSecs) ? durationSecs : null, // durée d'un message vocal, en secondes
     }));
     const convUpdate = { updatedAt: new Date() };
     if (req.user.type !== "employee") convUpdate.unreadForEmployees = true;
