@@ -8,10 +8,15 @@ const { sameConversationOnly } = require("../middleware/convAccess");
 const router = express.Router();
 router.use(authMiddleware);
 
-// Liste des conversations
+// Liste des conversations. Réservée aux employés pour la vue "toutes les conversations" (where={}) ;
+// pour un client ou un invité, restreinte à sa seule conversation (faille IDOR corrigée cette session :
+// avant, un invité — identité peu fiable, obtenue via un simple lien partagé — récupérait ici la liste
+// COMPLÈTE de toutes les conversations de tous les clients, pas seulement la sienne).
 router.get("/", async (req, res) => {
   try {
-    const where = req.user.type === "client" ? { clientId: req.user.id } : {};
+    const where = req.user.type === "client" ? { clientId: req.user.id }
+      : req.user.type === "guest" ? { id: req.user.conversationId }
+      : {};
     const convs = await Conversation.findAll({
       where,
       include: [Client, Employee, { model: Message, limit: 1, order: [["createdAt","DESC"]], separate: true }],

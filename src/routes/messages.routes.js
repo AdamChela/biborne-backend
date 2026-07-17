@@ -82,15 +82,26 @@ async function notifyPush(convId, senderType, msg) {
   } catch (e) { console.error("[Push] Erreur notifyPush:", e.message); }
 }
 
-// Historique
+// Historique, paginé : renvoie par défaut les 50 derniers messages (ordre chronologique croissant).
+// ?before=<ISO createdAt du plus ancien message déjà chargé> pour remonter dans l'historique.
+// ?limit=<n> pour ajuster la taille de page (200 max). hasMore indique s'il reste des messages plus anciens.
 router.get("/:convId", sameConversationOnly, async (req, res) => {
   try {
-    const msgs = await Message.findAll({
-      where: { conversationId: req.params.convId },
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const where = { conversationId: req.params.convId };
+    if (req.query.before) {
+      const before = new Date(req.query.before);
+      if (!isNaN(before)) where.createdAt = { [Op.lt]: before };
+    }
+    const rows = await Message.findAll({
+      where,
       include: [{ model: Employee, attributes: ["id", "name"] }],
-      order: [["createdAt","ASC"]],
+      order: [["createdAt", "DESC"]],
+      limit: limit + 1,
     });
-    res.json(msgs);
+    const hasMore = rows.length > limit;
+    const messages = rows.slice(0, limit).reverse().map(m => m.toJSON());
+    res.json({ messages, hasMore });
   } catch (e) { console.error(e); alertError(req, e); res.status(500).json({ error: "Erreur serveur" }); }
 });
 

@@ -24,4 +24,9 @@ function rateLimit({ windowMs = 15 * 60 * 1000, max = 10, keyFn } = {}) {
   };
 }
 
-module.exports = { rateLimit };
+// Exporté uniquement pour les tests automatisés : vide les compteurs entre deux tests pour que
+// les nombreux appels de test (register/verify/login répétés) ne se bloquent pas mutuellement
+// via un 429, sans changer le comportement réel en production.
+function _resetForTests() { buckets.clear(); }
+
+module.exports = { rateLimit, _resetForTests };
