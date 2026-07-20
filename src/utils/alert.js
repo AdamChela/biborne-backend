@@ -1,4 +1,4 @@
-const { getTransporter } = require("./email");
+const { sendEmail, emailConfigured } = require("./email");
 
 const ALERT_TO = process.env.ALERT_EMAIL || "adam.biborne@gmail.com";
 const RATE_LIMIT_MS = 30 * 60 * 1000; // 30 min : évite de spammer si la même erreur se répète en boucle
@@ -6,18 +6,12 @@ const RATE_LIMIT_MS = 30 * 60 * 1000; // 30 min : évite de spammer si la même 
 const lastSent = new Map(); // signature d'erreur -> timestamp du dernier email envoyé pour cette erreur
 
 async function sendAlertEmail(subject, text) {
-  const transporter = getTransporter();
-  if (!transporter) {
+  if (!emailConfigured()) {
     console.log(`\n🚨 ALERTE (email non configuré) : ${subject}\n${text}\n`);
     return;
   }
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `Biborne <${process.env.EMAIL_USER}>`,
-      to: ALERT_TO,
-      subject: `[Biborne] ${subject}`,
-      text,
-    });
+    await sendEmail({ to: ALERT_TO, subject: `[Biborne] ${subject}`, text });
   } catch (e) {
     console.error("[Alert] Échec envoi email d'alerte :", e.message);
   }

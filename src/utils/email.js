@@ -1,29 +1,36 @@
-const nodemailer = require("nodemailer");
+// Envoi d'emails via l'API HTTP de Resend (https://resend.com).
+// Le SMTP direct (Gmail, puis même le relais SMTP de Resend) timeout systématiquement depuis Render :
+// c'est Render qui bloque les connexions SMTP sortantes en général, pas juste Gmail. L'API HTTP de
+// Resend passe en HTTPS (port 443), jamais bloqué, donc la seule méthode fiable dans cet environnement.
+const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.EMAIL_PASS; // EMAIL_PASS = fallback (déjà la clé Resend)
+const EMAIL_FROM = process.env.EMAIL_FROM || "Biborne <onboarding@resend.dev>";
 
-function getTransporter() {
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER) return null;
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || "587"),
-    secure: process.env.EMAIL_PORT === "465",
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    // Sans ces limites, une connexion SMTP bloquée (ex: port sortant filtré par l'hébergeur)
-    // fait attendre la requête indéfiniment côté client (bouton "Envoi..." qui ne se débloque jamais).
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+function emailConfigured() {
+  return !!RESEND_API_KEY;
+}
+
+async function sendEmail({ to, subject, html, text }) {
+  if (!RESEND_API_KEY) {
+    // Mode dev : pas de clé configurée, on affiche juste dans la console au lieu d'envoyer.
+    console.log(`\n📧 EMAIL NON ENVOYÉ (RESEND_API_KEY manquante) — à : ${to} — sujet : ${subject}\n${text || ""}\n`);
+    return;
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: EMAIL_FROM, to, subject, html, text }),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Resend a refusé l'envoi (${res.status}) : ${body.slice(0, 200)}`);
+  }
 }
 
 async function sendVerificationEmail(to, name, code) {
-  const transporter = getTransporter();
-  if (!transporter) {
-    // Mode dev : affiche le code dans la console
-    console.log(`\n📧 CODE DE VERIFICATION pour ${to} : [ ${code} ]\n`);
-    return;
-  }
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || `Biborne <${process.env.EMAIL_USER}>`,
+  await sendEmail({
     to,
     subject: "Votre code de vérification Biborne",
     html: `
@@ -43,13 +50,7 @@ async function sendVerificationEmail(to, name, code) {
 }
 
 async function sendPasswordResetEmail(to, name, code) {
-  const transporter = getTransporter();
-  if (!transporter) {
-    console.log(`\n📧 CODE DE REINITIALISATION pour ${to} : [ ${code} ]\n`);
-    return;
-  }
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || `Biborne <${process.env.EMAIL_USER}>`,
+  await sendEmail({
     to,
     subject: "Réinitialisation de votre mot de passe Biborne",
     html: `
@@ -68,4 +69,4 @@ async function sendPasswordResetEmail(to, name, code) {
   });
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, getTransporter };
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendEmail, emailConfigured };
